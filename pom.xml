@@ -15,7 +15,37 @@
     <properties>
         <maven.compiler.source>1.10</maven.compiler.source>
         <maven.compiler.target>1.10</maven.compiler.target>
+        <fabric.sdk.java.version>1.3.0-SNAPSHOT</fabric.sdk.java.version>
     </properties>
 
-
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.hyperledger.fabric-sdk-java</groupId>
+                <artifactId>fabric-sdk-java</artifactId>
+                <version>${fabric.sdk.java.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>org.junit</groupId>
+                <artifactId>junit-bom</artifactId>
+                <version>5.2.0</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <artifactId>junit-jupiter-api</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+        </dependency>
+        <dependency>
+            <artifactId>junit-jupiter-engine</artifactId>
+            <groupId>org.junit.jupiter</groupId>
+        </dependency>
+        <dependency>
+            <groupId>org.junit.platform</groupId>
+            <artifactId>junit-platform-launcher</artifactId>
+        </dependency>
+    </dependencies>
 </project>
