@@ -42,8 +42,8 @@ public class DeployChannel {
     ChaincodeManager chaincodeManager = new ChaincodeManager(statelessClient);
 
 
-    Map<Peer, ChaincodeDeploymentInfo> deploymentInfo = chaincodeManager.deployChaincode(
-        "example_cc_java_al",
+    Map<Peer, ChaincodeDeploymentInfo> deploymentInfo = chaincodeManager.deployChaincodeBlocking(
+        "example_cc_java_al8",
         "1",
         "/Users/albertlacambra/git/fabric-sdk-java/src/test/fixture/sdkintegration/javacc/sample1",
         channel.getPeers(),
@@ -51,7 +51,13 @@ public class DeployChannel {
         TransactionRequest.Type.JAVA
     );
 
-    deploymentInfo.values().forEach(d -> Assertions.assertTrue(d.deploymentSucced(), () -> d.getMessage()));
+    deploymentInfo.values().forEach(d -> {
+          Assertions.assertTrue(d.deploymentSucceed(), () -> d.getMessage());
+          System.out.println(d.getMessage());
+        }
+    );
+
+
   }
 
 

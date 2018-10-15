@@ -9,11 +9,9 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.temporal.TemporalUnit;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -39,7 +37,22 @@ public class ChaincodeManager {
     this(chaincodeClient, new SDKUtilsWrapper());
   }
 
-  public Map<Peer, ChaincodeDeploymentInfo> deployChaincode(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
+  public Map<Peer, ChaincodeDeploymentInfo> deployChaincodeBlocking(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
+
+    Objects.requireNonNull(ccName);
+    Objects.requireNonNull(ccVersion);
+    Objects.requireNonNull(chaincodeSourceLocation);
+    Objects.requireNonNull(client);
+    Objects.requireNonNull(type);
+
+    try {
+      return deployChaincode(ccName, ccVersion, chaincodeSourceLocation, peers, client, type).get(deployCCTimeout.getSeconds(), TimeUnit.SECONDS);
+    } catch (TimeoutException | InterruptedException | ExecutionException e) {
+      throw new ChaincodeDeploymentException(e);
+    }
+  }
+
+  public CompletableFuture<Map<Peer, ChaincodeDeploymentInfo>> deployChaincode(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
 
     Objects.requireNonNull(ccName);
     Objects.requireNonNull(ccVersion);
@@ -57,23 +70,24 @@ public class ChaincodeManager {
 
     final Map<Peer, ChaincodeDeploymentInfo> results = new ConcurrentHashMap<>(peers.size());
 
-    try {
-      executorService.submit(() ->
-          toDeployPeers
-              .parallelStream()
-              .forEach(peer -> {
-                    ChaincodeDeploymentInfo result = deployChaincode(chaincodeID, chaincodeSourceLocation, peer, client, type);
-                    results.put(peer, result);
-                  }
-              )
-      ).get(deployCCTimeout.getSeconds(), TimeUnit.SECONDS);
-    } catch (InterruptedException | ExecutionException e) {
-      LOGGER.log(Level.SEVERE, "[deployChaincode] Error during chaincode deployment:" + e.getClass().getName() + ":" + e.getMessage(), e);
-    } catch (TimeoutException e) {
-      LOGGER.warning("[deployChaincode] Timeout during chaincode deployment:" + e.getClass().getName() + ":" + e.getMessage());
-    }
+    Future<?> f = executorService.submit(() ->
+        toDeployPeers
+            .parallelStream()
+            .forEach(peer -> {
+                  ChaincodeDeploymentInfo result = deployChaincode(chaincodeID, chaincodeSourceLocation, peer, client, type);
+                  results.put(peer, result);
+                }
+            )
+    );
 
-    return results;
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        f.get(deployCCTimeout.getSeconds(), TimeUnit.SECONDS);
+        return results;
+      } catch (TimeoutException | InterruptedException | ExecutionException e) {
+        throw new ChaincodeDeploymentException(e);
+      }
+    }, executorService);
   }
 
   public ChaincodeDeploymentInfo deployChaincode(ChaincodeID chaincodeID, String chaincodeSourceLocation, Peer peer, HFClient client, TransactionRequest.Type type) {
@@ -111,13 +125,13 @@ public class ChaincodeManager {
         //TODO: when could not come?
         return null;
       } else {
-        return ChaincodeDeploymentInfo.fromProposalResponse(responses.iterator().next());
+        ProposalResponse response = responses.iterator().next();
+        return ChaincodeDeploymentInfo.fromProposalResponse(response);
       }
     } catch (ProposalException | InvalidArgumentException e) {
       throw new FabricClientException(e);
     }
   }
-
 
   public Map<Peer, SimulationInfo> instantiateOrUpgradeChaincode(
       ChaincodeID chaincodeID,

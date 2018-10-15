@@ -9,40 +9,48 @@ import java.util.Objects;
 public class ChaincodeDeploymentInfo {
 
   private static final String ALREADY_DEPLOYED_MESSAGE = "Chaincode already deployed";
+  private final boolean successful;
+  private final String message;
   private ProposalResponse proposalResponse;
   private Exception exception;
   private ChaincodeID chaincodeID;
 
   private ChaincodeDeploymentInfo(ProposalResponse proposalResponse) {
     this.proposalResponse = Objects.requireNonNull(proposalResponse);
+    successful = proposalResponse.getStatus() == ChaincodeResponse.Status.SUCCESS;
+    message = extractMessageFromProposal(proposalResponse);
   }
 
 
   private ChaincodeDeploymentInfo(Exception exception) {
     this.exception = Objects.requireNonNull(exception);
+    successful = false;
+    message = exception.getMessage();
   }
 
   public ChaincodeDeploymentInfo(ChaincodeID chaincodeID) {
+    successful = true;
     this.chaincodeID = chaincodeID;
+    message = ALREADY_DEPLOYED_MESSAGE + ". ChaincodeName=" + chaincodeID.getName() + ", ChaincodeVersion=" + chaincodeID.getVersion();
   }
 
 
-  public boolean deploymentSucced() {
-    return exception == null && proposalResponse.isVerified() && proposalResponse.getStatus() == ChaincodeResponse.Status.SUCCESS;
+  public boolean deploymentSucceed() {
+    return successful;
   }
 
   public String getMessage() {
-    if (exception != null) {
-      return exception.getMessage();
-    } else if (proposalResponse != null) {
-      if (proposalResponse.getProposalResponse() == null) {
-        return "No response received. Peer exists? Peer=" + Printer.toString(proposalResponse.getPeer());
-      }
-      return proposalResponse.getProposalResponse().getPayload().toStringUtf8();
-    } else {
-      return ALREADY_DEPLOYED_MESSAGE + ". ChaincodeName=" + chaincodeID.getName() + ", ChaincodeVersion=" + chaincodeID.getVersion();
-    }
+    return message;
   }
+
+  private String extractMessageFromProposal(ProposalResponse proposalResponse) {
+    if (proposalResponse.getProposalResponse() == null) {
+      return "No response received. Peer exists? Peer=" + Printer.toString(proposalResponse.getPeer());
+    }
+
+    return proposalResponse.getProposalResponse().getResponse().getPayload().toStringUtf8() + ":" + proposalResponse.getProposalResponse().getResponse().getMessage() + ":" + proposalResponse.getProposalResponse().getPayload().toStringUtf8();
+  }
+
 
   public static ChaincodeDeploymentInfo fromProposalResponse(ProposalResponse proposalResponse) {
     Objects.requireNonNull(proposalResponse);
