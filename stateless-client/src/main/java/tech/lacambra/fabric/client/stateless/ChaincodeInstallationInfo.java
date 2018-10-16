@@ -6,7 +6,7 @@ import org.hyperledger.fabric.sdk.ProposalResponse;
 
 import java.util.Objects;
 
-public class ChaincodeDeploymentInfo {
+public class ChaincodeInstallationInfo {
 
   private static final String ALREADY_DEPLOYED_MESSAGE = "Chaincode already deployed";
   private final boolean successful;
@@ -14,7 +14,7 @@ public class ChaincodeDeploymentInfo {
   private ProposalResponse proposalResponse;
   private Exception exception;
 
-  private ChaincodeDeploymentInfo(ProposalResponse proposalResponse) {
+  private ChaincodeInstallationInfo(ProposalResponse proposalResponse) {
     this.proposalResponse = Objects.requireNonNull(proposalResponse);
     // Install will have no signing cause it's not really targeted to a channel. So not needed to call proposalResponse.isVerified()
     successful = proposalResponse.getStatus() == ChaincodeResponse.Status.SUCCESS;
@@ -22,13 +22,13 @@ public class ChaincodeDeploymentInfo {
   }
 
 
-  private ChaincodeDeploymentInfo(Exception exception) {
+  private ChaincodeInstallationInfo(Exception exception) {
     this.exception = Objects.requireNonNull(exception);
     successful = false;
     message = exception.getMessage();
   }
 
-  public ChaincodeDeploymentInfo(ChaincodeID chaincodeID) {
+  private ChaincodeInstallationInfo(ChaincodeID chaincodeID) {
     successful = true;
     message = ALREADY_DEPLOYED_MESSAGE + ". ChaincodeName=" + chaincodeID.getName() + ", ChaincodeVersion=" + chaincodeID.getVersion();
   }
@@ -58,18 +58,18 @@ public class ChaincodeDeploymentInfo {
   }
 
 
-  public static ChaincodeDeploymentInfo fromProposalResponse(ProposalResponse proposalResponse) {
+  public static ChaincodeInstallationInfo fromProposalResponse(ProposalResponse proposalResponse) {
     Objects.requireNonNull(proposalResponse);
-    return new ChaincodeDeploymentInfo(proposalResponse);
+    return new ChaincodeInstallationInfo(proposalResponse);
   }
 
-  public static ChaincodeDeploymentInfo fromError(Exception e) {
+  public static ChaincodeInstallationInfo fromError(Exception e) {
     Objects.requireNonNull(e);
-    return new ChaincodeDeploymentInfo(e);
+    return new ChaincodeInstallationInfo(e);
   }
 
-  public static ChaincodeDeploymentInfo alreadyDeployed(ChaincodeID chaincodeID) {
+  public static ChaincodeInstallationInfo alreadyDeployed(ChaincodeID chaincodeID) {
     Objects.requireNonNull(chaincodeID);
-    return new ChaincodeDeploymentInfo(chaincodeID);
+    return new ChaincodeInstallationInfo(chaincodeID);
   }
 }

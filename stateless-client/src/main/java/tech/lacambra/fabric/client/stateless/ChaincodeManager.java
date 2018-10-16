@@ -9,6 +9,7 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
@@ -22,22 +23,22 @@ public class ChaincodeManager {
   private static final Logger LOGGER = Logger.getLogger(ChaincodeManager.class.getName());
 
   private ExecutorService executorService = new ForkJoinPool(4);
-  private Duration deployCCTimeout = Duration.ofMinutes(1);
+  private Duration installCCTimeout = Duration.ofMinutes(1);
+  private Duration instantiateCCTimeout = Duration.ofMinutes(1);
+  private Duration ordererTimeout = Duration.ofMinutes(1);
 
-  private StatelessClient chaincodeClient;
   private final SDKUtilsWrapper sdkUtilsWrapper;
 
 
-  public ChaincodeManager(StatelessClient chaincodeClient, SDKUtilsWrapper sdkUtilsWrapper) {
-    this.chaincodeClient = Objects.requireNonNull(chaincodeClient);
+  public ChaincodeManager(SDKUtilsWrapper sdkUtilsWrapper) {
     this.sdkUtilsWrapper = Objects.requireNonNull(sdkUtilsWrapper);
   }
 
-  public ChaincodeManager(StatelessClient chaincodeClient) {
-    this(chaincodeClient, new SDKUtilsWrapper());
+  public ChaincodeManager() {
+    this(new SDKUtilsWrapper());
   }
 
-  public Map<Peer, ChaincodeDeploymentInfo> deployChaincodeBlocking(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
+  public Map<Peer, ChaincodeInstallationInfo> installChaincodeBlocking(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
 
     Objects.requireNonNull(ccName);
     Objects.requireNonNull(ccVersion);
@@ -46,21 +47,19 @@ public class ChaincodeManager {
     Objects.requireNonNull(type);
 
     try {
-      return deployChaincode(ccName, ccVersion, chaincodeSourceLocation, peers, client, type).get(deployCCTimeout.getSeconds(), TimeUnit.SECONDS);
+      return installChaincode(ccName, ccVersion, chaincodeSourceLocation, peers, client, type).get(installCCTimeout.getSeconds(), TimeUnit.SECONDS);
     } catch (TimeoutException | InterruptedException | ExecutionException e) {
       throw new ChaincodeDeploymentException(e);
     }
   }
 
-  public CompletableFuture<Map<Peer, ChaincodeDeploymentInfo>> deployChaincode(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
+  public CompletableFuture<Map<Peer, ChaincodeInstallationInfo>> installChaincode(String ccName, String ccVersion, String chaincodeSourceLocation, Collection<Peer> peers, HFClient client, TransactionRequest.Type type) {
 
     Objects.requireNonNull(ccName);
     Objects.requireNonNull(ccVersion);
     Objects.requireNonNull(chaincodeSourceLocation);
     Objects.requireNonNull(client);
     Objects.requireNonNull(type);
-
-    ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
 
     if (peers == null || peers.isEmpty()) {
       throw new IllegalArgumentException("no peers given");
@@ -68,13 +67,13 @@ public class ChaincodeManager {
 
     Set<Peer> toDeployPeers = new HashSet<>(peers);
 
-    final Map<Peer, ChaincodeDeploymentInfo> results = new ConcurrentHashMap<>(peers.size());
+    final Map<Peer, ChaincodeInstallationInfo> results = new ConcurrentHashMap<>(peers.size());
 
     Future<?> f = executorService.submit(() ->
         toDeployPeers
             .parallelStream()
             .forEach(peer -> {
-                  ChaincodeDeploymentInfo result = deployChaincode(chaincodeID, chaincodeSourceLocation, peer, client, type);
+                  ChaincodeInstallationInfo result = installChaincode(ccName, ccVersion, chaincodeSourceLocation, peer, client, type);
                   results.put(peer, result);
                 }
             )
@@ -82,7 +81,7 @@ public class ChaincodeManager {
 
     return CompletableFuture.supplyAsync(() -> {
       try {
-        f.get(deployCCTimeout.getSeconds(), TimeUnit.SECONDS);
+        f.get(installCCTimeout.getSeconds(), TimeUnit.SECONDS);
         return results;
       } catch (TimeoutException | InterruptedException | ExecutionException e) {
         throw new ChaincodeDeploymentException(e);
@@ -90,29 +89,31 @@ public class ChaincodeManager {
     }, executorService);
   }
 
-  public ChaincodeDeploymentInfo deployChaincode(ChaincodeID chaincodeID, String chaincodeSourceLocation, Peer peer, HFClient client, TransactionRequest.Type type) {
+  public ChaincodeInstallationInfo installChaincode(String ccName, String ccVersion, String chaincodeSourceLocation, Peer peer, HFClient client, TransactionRequest.Type type) {
 
-    Objects.requireNonNull(chaincodeID);
+    Objects.requireNonNull(ccName);
+    Objects.requireNonNull(ccVersion);
     Objects.requireNonNull(chaincodeSourceLocation);
     Objects.requireNonNull(client);
     Objects.requireNonNull(peer);
     Objects.requireNonNull(type);
 
-    if (isChaincodeDeployed(peer, chaincodeID, client)) {
-      return ChaincodeDeploymentInfo.alreadyDeployed(chaincodeID);
-    }
+    ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
 
+    if (isChaincodeDeployed(peer, chaincodeID, client)) {
+      return ChaincodeInstallationInfo.alreadyDeployed(chaincodeID);
+    }
 
     Collection<ProposalResponse> responses;
 
-    LOGGER.info("[deployChaincode] Installing chaincode. Preparing Request Structure to install chaincode");
+    LOGGER.info("[installChaincode] Installing chaincode. Preparing Request Structure to install chaincode");
     InstallProposalRequest installProposalRequest = client.newInstallProposalRequest();
     installProposalRequest.setChaincodeID(chaincodeID);
 
     try {
       installProposalRequest.setChaincodeSourceLocation(new File(chaincodeSourceLocation));
     } catch (InvalidArgumentException e) {
-      LOGGER.warning("[deployChaincode] Problems loading ccSourceLocation. Error=" + e.getMessage());
+      LOGGER.warning("[installChaincode] Problems loading ccSourceLocation. Error=" + e.getMessage());
     }
 
     installProposalRequest.setChaincodeLanguage(type);
@@ -122,16 +123,105 @@ public class ChaincodeManager {
       responses = client.sendInstallProposal(installProposalRequest, Collections.singletonList(peer));
 
       if (responses.isEmpty()) {
-        //TODO: when could not come?
-        return null;
+        throw new ChaincodeDeploymentException("No response received from peer=" + Printer.toString(peer));
       } else {
         ProposalResponse response = responses.iterator().next();
-        return ChaincodeDeploymentInfo.fromProposalResponse(response);
+        return ChaincodeInstallationInfo.fromProposalResponse(response);
       }
     } catch (ProposalException | InvalidArgumentException e) {
       throw new FabricClientException(e);
     }
   }
+
+  public CompletableFuture<Map<Peer, ChaincodeInstantiationInfo>> instantiateChaincode(String ccName,
+                                                                           String ccVersion,
+                                                                           Collection<Peer> peers,
+                                                                           Collection<Orderer> orderers,
+                                                                           Channel channel,
+                                                                           String endorsementPolicyConfigFile,
+                                                                           HFClient client,
+                                                                           TransactionRequest.Type type) {
+
+    Objects.requireNonNull(ccName);
+    Objects.requireNonNull(ccVersion);
+    Objects.requireNonNull(channel);
+    Objects.requireNonNull(type);
+    Objects.requireNonNull(client);
+    Objects.requireNonNull(endorsementPolicyConfigFile);
+
+    if (peers == null || peers.isEmpty()) {
+      throw new FabricClientException("No peers given");
+    }
+
+    if (orderers == null || orderers.isEmpty()) {
+      throw new FabricClientException("No orderer given");
+    }
+
+
+    List<CompletableFuture> cfs = new ArrayList<>(peers.size());
+    Map<Peer, ChaincodeInstantiationInfo> results = new ConcurrentHashMap<>(peers.size());
+    for (Peer peer : peers) {
+
+      CompletableFuture f = instantiate(ccName, ccVersion, peer, orderers, channel, endorsementPolicyConfigFile, client, type)
+          .thenApply(simulationInfo -> results.put(peer, simulationInfo));
+
+      cfs.add(f);
+
+    }
+
+    return CompletableFuture.allOf(cfs.toArray(new CompletableFuture[peers.size()])).thenApply(v -> results);
+
+  }
+
+  public CompletableFuture<ChaincodeInstantiationInfo> instantiate(String ccName,
+                                                                   String ccVersion,
+                                                                   Peer peer,
+                                                                   Collection<Orderer> orderers,
+                                                                   Channel channel,
+                                                                   String endorsementPolicyConfigFile,
+                                                                   HFClient client,
+                                                                   TransactionRequest.Type type) {
+
+
+    Objects.requireNonNull(ccName);
+    Objects.requireNonNull(ccVersion);
+    Objects.requireNonNull(channel);
+    Objects.requireNonNull(client);
+    Objects.requireNonNull(peer);
+    Objects.requireNonNull(type);
+    Objects.requireNonNull(endorsementPolicyConfigFile);
+
+    if (orderers == null || orderers.isEmpty()) {
+      throw new FabricClientException("No orderer given");
+    }
+
+    ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
+
+    InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
+    instantiateProposalRequest.setProposalWaitTime(instantiateCCTimeout.get(ChronoUnit.MILLIS));
+    instantiateProposalRequest.setChaincodeID(chaincodeID);
+
+    Map<String, byte[]> tm = new HashMap<>();
+    tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
+    tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
+    try {
+      instantiateProposalRequest.setTransientMap(tm);
+    } catch (InvalidArgumentException e) {
+      throw new IllegalArgumentException(e);
+    }
+
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        Collection<ProposalResponse> responses = channel.sendInstantiationProposal(instantiateProposalRequest, Collections.singleton(peer));
+        return ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next());
+      } catch (InvalidArgumentException e) {
+        throw new IllegalArgumentException(e);
+      } catch (ProposalException e) {
+        return ChaincodeInstantiationInfo.fromError(e);
+      }
+    }, executorService).thenApply(chaincodeInstantiationInfo -> sendTransactionToOrderer(chaincodeInstantiationInfo, orderers, channel));
+  }
+
 
   public Map<Peer, SimulationInfo> instantiateOrUpgradeChaincode(
       ChaincodeID chaincodeID,
@@ -216,7 +306,7 @@ public class ChaincodeManager {
     SimulationInfo responsesValidatorResult = new PeerTransactionValidator(sdkUtilsWrapper).validate(responses);
 
     if (responsesValidatorResult.canBeSendToOrderer()) {
-      chaincodeClient.sendTransactionToOrderer(responsesValidatorResult, orderers, channel);
+      sendTransactionToOrderer(responsesValidatorResult, orderers, channel);
     }
 
     return responsesValidatorResult;
@@ -362,5 +452,55 @@ public class ChaincodeManager {
     }
 
     return instantiateProposalRequest;
+  }
+
+  public boolean checkInstantiatedChaincode(Channel channel, Peer peer, String ccName, String ccPath, String ccVersion) throws
+      InvalidArgumentException, ProposalException {
+    LOGGER.info(() -> String.format("[checkInstantiatedChaincode] Checking instantiated chaincode: %s, at version: %s, on peer: %s ", ccName, ccVersion, peer.getName()));
+    List<Query.ChaincodeInfo> ccinfoList = channel.queryInstantiatedChaincodes(peer);
+
+    boolean found = false;
+
+    for (Query.ChaincodeInfo ccifo : ccinfoList) {
+      found = ccName.equals(ccifo.getName()) && ccPath.equals(ccifo.getPath()) && ccVersion.equals(ccifo.getVersion());
+      if (found) {
+        break;
+      }
+    }
+
+    return found;
+  }
+
+  private CompletableFuture<BlockEvent.TransactionEvent> sendTransactionToOrderer(SimulationInfo validatorResult, Collection<Orderer> orderers, Channel
+      channel) {
+
+    if (!validatorResult.simulationsSucceed()) {
+      LOGGER.warning(() -> "[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
+      CompletableFuture<BlockEvent.TransactionEvent> cf = new CompletableFuture<>();
+      cf.completeExceptionally(new RuntimeException("proposal has failed:" + validatorResult.getMessage()));
+      return cf;
+    }
+
+    return channel.sendTransaction(validatorResult.getSuccessfulProposals(), orderers);
+  }
+
+  private ChaincodeInstantiationInfo sendTransactionToOrderer(
+      ChaincodeInstantiationInfo deploymentInfo,
+      Collection<Orderer> orderers, Channel
+          channel) {
+
+    if (!deploymentInfo.peerInstantiationSucceed()) {
+      LOGGER.warning(() -> "[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
+      CompletableFuture<BlockEvent.TransactionEvent> cf = new CompletableFuture<>();
+      return ChaincodeInstantiationInfo.fromError(new ChaincodeDeploymentException("proposal has failed:" + deploymentInfo.getMessage()));
+    }
+
+    try {
+      return channel.sendTransaction(Collections.singleton(deploymentInfo.getProposalResponse()), orderers)
+          .thenApply(deploymentInfo::fromOrdererResponse)
+          .get(ordererTimeout.getSeconds(), TimeUnit.SECONDS);
+    } catch (InterruptedException | ExecutionException | TimeoutException e) {
+      return ChaincodeInstantiationInfo.fromError(e);
+    }
   }
 }

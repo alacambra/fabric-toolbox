@@ -39,10 +39,10 @@ public class DeployChannel {
 
 
     StatelessClient statelessClient = new StatelessClient();
-    ChaincodeManager chaincodeManager = new ChaincodeManager(statelessClient);
+    ChaincodeManager chaincodeManager = new ChaincodeManager();
 
 
-    Map<Peer, ChaincodeDeploymentInfo> deploymentInfo = chaincodeManager.deployChaincodeBlocking(
+    Map<Peer, ChaincodeInstallationInfo> deploymentInfo = chaincodeManager.installChaincodeBlocking(
         "example_cc_java_al8",
         "1",
         "/Users/albertlacambra/git/fabric-sdk-java/src/test/fixture/sdkintegration/javacc/sample1",
