@@ -13,10 +13,10 @@ public class ChaincodeDeploymentInfo {
   private final String message;
   private ProposalResponse proposalResponse;
   private Exception exception;
-  private ChaincodeID chaincodeID;
 
   private ChaincodeDeploymentInfo(ProposalResponse proposalResponse) {
     this.proposalResponse = Objects.requireNonNull(proposalResponse);
+    // Install will have no signing cause it's not really targeted to a channel. So not needed to call proposalResponse.isVerified()
     successful = proposalResponse.getStatus() == ChaincodeResponse.Status.SUCCESS;
     message = extractMessageFromProposal(proposalResponse);
   }
@@ -30,10 +30,16 @@ public class ChaincodeDeploymentInfo {
 
   public ChaincodeDeploymentInfo(ChaincodeID chaincodeID) {
     successful = true;
-    this.chaincodeID = chaincodeID;
     message = ALREADY_DEPLOYED_MESSAGE + ". ChaincodeName=" + chaincodeID.getName() + ", ChaincodeVersion=" + chaincodeID.getVersion();
   }
 
+  public ProposalResponse getProposalResponse() {
+    return proposalResponse;
+  }
+
+  public Exception getException() {
+    return exception;
+  }
 
   public boolean deploymentSucceed() {
     return successful;
