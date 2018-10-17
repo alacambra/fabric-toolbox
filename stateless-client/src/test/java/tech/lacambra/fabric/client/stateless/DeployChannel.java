@@ -12,12 +12,17 @@ import java.io.File;
 import java.io.IOException;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 public class DeployChannel {
 
 
   @Test
   public void test() throws NetworkConfigurationException, IOException, InvalidArgumentException, TransactionException {
+
+    String ccName = "example_cc_java_al";
+    String version = "3";
+    String ccSourceLocation = "/Users/albertlacambra/git/fabric-sdk-java/src/test/fixture/sdkintegration/javacc/sample1";
 
     NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File("/Users/albertlacambra/git/lacambra.tech/fabric-toolbox/stateless-client/src/test/resources/network-config.yaml"));
     networkConfig.getPeerNames().stream().map(n -> {
@@ -38,24 +43,30 @@ public class DeployChannel {
     Assertions.assertTrue(channel.isInitialized());
 
 
-    StatelessClient statelessClient = new StatelessClient();
     ChaincodeManager chaincodeManager = new ChaincodeManager();
 
 
     Map<Peer, ChaincodeInstallationInfo> deploymentInfo = chaincodeManager.installChaincodeBlocking(
-        "example_cc_java_al8",
-        "1",
-        "/Users/albertlacambra/git/fabric-sdk-java/src/test/fixture/sdkintegration/javacc/sample1",
+        ccName,
+        version,
+        ccSourceLocation,
         channel.getPeers(),
         hfClient,
         TransactionRequest.Type.JAVA
     );
 
     deploymentInfo.values().forEach(d -> {
-          Assertions.assertTrue(d.deploymentSucceed(), () -> d.getMessage());
+          Assertions.assertTrue(d.deploymentSucceed(), d::getMessage);
           System.out.println(d.getMessage());
         }
     );
+
+    CompletableFuture<Map<Peer, ChaincodeInstantiationInfo>> results = chaincodeManager.instantiate(ccName, version, channel.getPeers(), channel.getOrderers(), channel, "", hfClient, TransactionRequest.Type.JAVA);
+
+    results.join().values().forEach(r -> {
+      Assertions.assertTrue(r.peerInstantiationSucceed(), r::getMessage);
+      System.out.println(r.getMessage());
+    });
 
 
   }

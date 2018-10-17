@@ -9,10 +9,10 @@ import org.hyperledger.fabric.sdk.exception.ProposalException;
 import java.io.File;
 import java.io.IOException;
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
@@ -133,14 +133,14 @@ public class ChaincodeManager {
     }
   }
 
-  public CompletableFuture<Map<Peer, ChaincodeInstantiationInfo>> instantiateChaincode(String ccName,
-                                                                           String ccVersion,
-                                                                           Collection<Peer> peers,
-                                                                           Collection<Orderer> orderers,
-                                                                           Channel channel,
-                                                                           String endorsementPolicyConfigFile,
-                                                                           HFClient client,
-                                                                           TransactionRequest.Type type) {
+  public CompletableFuture<Map<Peer, ChaincodeInstantiationInfo>> instantiate(String ccName,
+                                                                              String ccVersion,
+                                                                              Collection<Peer> peers,
+                                                                              Collection<Orderer> orderers,
+                                                                              Channel channel,
+                                                                              String endorsementPolicyConfigFile,
+                                                                              HFClient client,
+                                                                              TransactionRequest.Type type) {
 
     Objects.requireNonNull(ccName);
     Objects.requireNonNull(ccVersion);
@@ -181,8 +181,6 @@ public class ChaincodeManager {
                                                                    String endorsementPolicyConfigFile,
                                                                    HFClient client,
                                                                    TransactionRequest.Type type) {
-
-
     Objects.requireNonNull(ccName);
     Objects.requireNonNull(ccVersion);
     Objects.requireNonNull(channel);
@@ -197,119 +195,61 @@ public class ChaincodeManager {
 
     ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
 
-    InstantiateProposalRequest instantiateProposalRequest = client.newInstantiationProposalRequest();
-    instantiateProposalRequest.setProposalWaitTime(instantiateCCTimeout.get(ChronoUnit.MILLIS));
-    instantiateProposalRequest.setChaincodeID(chaincodeID);
-
-    Map<String, byte[]> tm = new HashMap<>();
-    tm.put("HyperLedgerFabric", "InstantiateProposalRequest:JavaSDK".getBytes(UTF_8));
-    tm.put("method", "InstantiateProposalRequest".getBytes(UTF_8));
-    try {
-      instantiateProposalRequest.setTransientMap(tm);
-    } catch (InvalidArgumentException e) {
-      throw new IllegalArgumentException(e);
-    }
-
     return CompletableFuture.supplyAsync(() -> {
+      Collection<ProposalResponse> responses = Collections.emptyList();
+
       try {
-        Collection<ProposalResponse> responses = channel.sendInstantiationProposal(instantiateProposalRequest, Collections.singleton(peer));
-        return ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next());
+        switch (shouldManipulate(peer, channel, ccName, ccVersion)) {
+          case INSTANTIATE:
+            InstantiateProposalRequest instantiateProposalRequest = instantiateChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
+            responses = channel.sendInstantiationProposal(instantiateProposalRequest);
+            break;
+          case UPGRADE:
+            UpgradeProposalRequest upgradeProposalRequest = upgradeChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
+            responses = channel.sendUpgradeProposal(upgradeProposalRequest);
+            break;
+          case NONE:
+            break;
+        }
       } catch (InvalidArgumentException e) {
         throw new IllegalArgumentException(e);
       } catch (ProposalException e) {
-        return ChaincodeInstantiationInfo.fromError(e);
+        throw new ChaincodeDeploymentException(e);
       }
-    }, executorService).thenApply(chaincodeInstantiationInfo -> sendTransactionToOrderer(chaincodeInstantiationInfo, orderers, channel));
+
+      return responses;
+    }, executorService)
+        .thenApply(responses -> ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next()))
+        .thenApply(chaincodeInstantiationInfo -> sendTransactionToOrderer(chaincodeInstantiationInfo, orderers, channel))
+        .exceptionally(throwable -> {
+
+          if (throwable.getCause() != null) {
+            throwable = throwable.getCause();
+          }
+
+          LOGGER.log(Level.WARNING, "[instantiate] " + throwable.getMessage(), throwable);
+          return ChaincodeInstantiationInfo.fromError((Exception) throwable);
+        });
   }
 
-
-  public Map<Peer, SimulationInfo> instantiateOrUpgradeChaincode(
-      ChaincodeID chaincodeID,
-      Collection<Peer> peers,
-      Collection<Orderer> orderers,
-      Channel channel,
-      String endorsementPolicyConfigFile,
-      HFClient client,
-      TransactionRequest.Type type) {
-
-    Objects.requireNonNull(chaincodeID);
-    Objects.requireNonNull(channel);
-    Objects.requireNonNull(client);
-    Objects.requireNonNull(endorsementPolicyConfigFile);
-
-    if (peers == null || peers.isEmpty()) {
-      throw new FabricClientException("No peers given");
-    }
-
-    if (orderers == null || orderers.isEmpty()) {
-      throw new FabricClientException("No orderer given");
-    }
-
-    Map<Peer, SimulationInfo> results = new HashMap<>(peers.size());
-
-    for (Peer p : peers) {
-
-      SimulationInfo result = instantiateOrUpgradeChaincode(chaincodeID, p, orderers, channel, endorsementPolicyConfigFile, client, type);
-      results.put(p, result);
-
-    }
-
-    return results;
+  enum Manipulation {
+    INSTANTIATE, UPGRADE, NONE
   }
 
-  public SimulationInfo instantiateOrUpgradeChaincode(
-      ChaincodeID chaincodeID,
-      Peer peer,
-      Collection<Orderer> orderers,
-      Channel channel,
-      String endorsementPolicyConfigFile,
-      HFClient client,
-      TransactionRequest.Type type) {
-
-    Collection<ProposalResponse> responses;
-    boolean shouldUpgrade;
-    boolean shouldInstantiate;
-
-        /*
-        Fetch all chaincodes of peer that matches with the given name. It may have several versions
-         */
+  private Manipulation shouldManipulate(Peer peer, Channel channel, String ccName, String ccVersion) {
     Set<Query.ChaincodeInfo> chaincodeInfos = getInstantiatedChaincodeOfChannel(peer, channel)
         .stream()
-        .filter(chaincodeInfo -> chaincodeInfo.getName().equals(chaincodeID.getName()))
+        .filter(chaincodeInfo -> chaincodeInfo.getName().equals(ccName))
         .collect(Collectors.toSet());
 
 
-    shouldInstantiate = chaincodeInfos.isEmpty();
-    shouldUpgrade = !shouldInstantiate && chaincodeInfos
+    boolean shouldInstantiate = chaincodeInfos.isEmpty();
+    boolean shouldUpgrade = !shouldInstantiate && chaincodeInfos
         .stream()
-        .noneMatch(chaincodeInfo -> chaincodeInfo.getVersion().equals(chaincodeID.getVersion()));
+        .noneMatch(chaincodeInfo -> chaincodeInfo.getVersion().equals(ccVersion));
 
-    try {
-      if (shouldInstantiate) {
-        LOGGER.info("[instantiateOrUpgradeChaincode] Chaincode will be instantiated. ChaincodeID=" + Printer.toString(chaincodeID));
-        InstantiateProposalRequest instantiateProposalRequest = instantiateChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
-        //TODO: instead one peer the whole list of selected peers could be passed
-        responses = channel.sendInstantiationProposal(instantiateProposalRequest, Collections.singleton(peer));
-      } else if (shouldUpgrade) {
-        LOGGER.info("[instantiateOrUpgradeChaincode] Chaincode will be updated. ChaincodeID=" + Printer.toString(chaincodeID));
-        UpgradeProposalRequest upgradeProposalRequest = upgradeChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
-        responses = channel.sendUpgradeProposal(upgradeProposalRequest);
-      } else {
-        LOGGER.info("[instantiateOrUpgradeChaincode] no need to instantiateChaincode or upgrade. Chaincode exists on the correct version");
-        return SimulationInfo.createValid("no need to instantiateChaincode or upgrade. Chaincode exists on the correct version");
-      }
-    } catch (ProposalException | InvalidArgumentException e) {
-      LOGGER.warning("[instantiateOrUpgradeChaincode] An error happens. Error=" + e.getMessage());
-      return SimulationInfo.createInvalid(e.getMessage());
-    }
+    return shouldInstantiate ? Manipulation.INSTANTIATE : shouldUpgrade ? Manipulation.UPGRADE : Manipulation.NONE;
 
-    SimulationInfo responsesValidatorResult = new PeerTransactionValidator(sdkUtilsWrapper).validate(responses);
-
-    if (responsesValidatorResult.canBeSendToOrderer()) {
-      sendTransactionToOrderer(responsesValidatorResult, orderers, channel);
-    }
-
-    return responsesValidatorResult;
   }
 
   public Set<Query.ChaincodeInfo> getChaincodeInfoOfPeer(Peer peer, HFClient client) {
@@ -397,7 +337,7 @@ public class ChaincodeManager {
 
     proposalRequest.setChaincodeID(chaincodeID);
     proposalRequest.setChaincodeLanguage(type);
-    proposalRequest.setArgs(new ArrayList<>(0));
+    proposalRequest.setArgs("a", "2", "a", "1");
     proposalRequest.setUserContext(user);
 
     return proposalRequest;
@@ -486,12 +426,10 @@ public class ChaincodeManager {
 
   private ChaincodeInstantiationInfo sendTransactionToOrderer(
       ChaincodeInstantiationInfo deploymentInfo,
-      Collection<Orderer> orderers, Channel
-          channel) {
+      Collection<Orderer> orderers, Channel channel) {
 
     if (!deploymentInfo.peerInstantiationSucceed()) {
       LOGGER.warning(() -> "[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
-      CompletableFuture<BlockEvent.TransactionEvent> cf = new CompletableFuture<>();
       return ChaincodeInstantiationInfo.fromError(new ChaincodeDeploymentException("proposal has failed:" + deploymentInfo.getMessage()));
     }
 
