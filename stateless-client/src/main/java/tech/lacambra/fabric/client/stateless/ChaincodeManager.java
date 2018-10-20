@@ -195,31 +195,7 @@ public class ChaincodeManager {
 
     ChaincodeID chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
 
-    return CompletableFuture.supplyAsync(() -> {
-      Collection<ProposalResponse> responses = Collections.emptyList();
-
-      try {
-        switch (shouldManipulate(peer, channel, ccName, ccVersion)) {
-          case INSTANTIATE:
-            InstantiateProposalRequest instantiateProposalRequest = instantiateChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
-            responses = channel.sendInstantiationProposal(instantiateProposalRequest);
-            break;
-          case UPGRADE:
-            UpgradeProposalRequest upgradeProposalRequest = upgradeChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
-            responses = channel.sendUpgradeProposal(upgradeProposalRequest);
-            break;
-          case NONE:
-            break;
-        }
-      } catch (InvalidArgumentException e) {
-        throw new IllegalArgumentException(e);
-      } catch (ProposalException e) {
-        throw new ChaincodeDeploymentException(e);
-      }
-
-      return responses;
-    }, executorService)
-        .thenApply(responses -> ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next()))
+    return CompletableFuture.supplyAsync(() -> manipulateCC(peer, channel, chaincodeID, endorsementPolicyConfigFile, client, type), executorService)
         .thenApply(chaincodeInstantiationInfo -> sendTransactionToOrderer(chaincodeInstantiationInfo, orderers, channel))
         .exceptionally(throwable -> {
 
@@ -234,6 +210,30 @@ public class ChaincodeManager {
 
   enum Manipulation {
     INSTANTIATE, UPGRADE, NONE
+  }
+
+  private ChaincodeInstantiationInfo manipulateCC(Peer peer, Channel channel, ChaincodeID chaincodeID, String endorsementPolicyConfigFile, HFClient client, TransactionRequest.Type type) {
+    Collection<ProposalResponse> responses;
+
+    try {
+      switch (shouldManipulate(peer, channel, chaincodeID.getName(), chaincodeID.getVersion())) {
+        case INSTANTIATE:
+          InstantiateProposalRequest instantiateProposalRequest = instantiateChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
+          responses = channel.sendInstantiationProposal(instantiateProposalRequest);
+          return ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next());
+        case UPGRADE:
+          UpgradeProposalRequest upgradeProposalRequest = upgradeChainCodeProposalRequest(chaincodeID, endorsementPolicyConfigFile, client, type);
+          responses = channel.sendUpgradeProposal(upgradeProposalRequest);
+          return ChaincodeInstantiationInfo.fromProposalResponse(responses.iterator().next());
+        case NONE:
+        default:
+          return ChaincodeInstantiationInfo.alreadyDeployed(chaincodeID);
+      }
+    } catch (InvalidArgumentException e) {
+      throw new IllegalArgumentException(e);
+    } catch (ProposalException e) {
+      throw new ChaincodeDeploymentException(e);
+    }
   }
 
   private Manipulation shouldManipulate(Peer peer, Channel channel, String ccName, String ccVersion) {
@@ -431,6 +431,8 @@ public class ChaincodeManager {
     if (!deploymentInfo.peerInstantiationSucceed()) {
       LOGGER.warning(() -> "[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
       return ChaincodeInstantiationInfo.fromError(new ChaincodeDeploymentException("proposal has failed:" + deploymentInfo.getMessage()));
+    } else if (deploymentInfo.isAlreadyDeployed()) {
+      return deploymentInfo;
     }
 
     try {

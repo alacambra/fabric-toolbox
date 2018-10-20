@@ -2,14 +2,12 @@ package tech.lacambra.fabric.client.stateless;
 
 import org.hyperledger.fabric.sdk.ProposalResponse;
 
-import javax.annotation.concurrent.ThreadSafe;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Objects;
 import java.util.logging.Logger;
 
-@ThreadSafe
 public class SimulationInfo {
 
   private static final Logger LOGGER = Logger.getLogger(PeerTransactionValidator.class.getName());
@@ -103,5 +101,4 @@ public class SimulationInfo {
         ", transactionId='" + transactionId + '\'' +
         '}';
   }
-
 }

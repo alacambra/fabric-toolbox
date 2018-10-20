@@ -18,24 +18,14 @@ public class DeployChannel {
 
 
   @Test
-  public void test() throws NetworkConfigurationException, IOException, InvalidArgumentException, TransactionException {
+  public void startChaincode() throws NetworkConfigurationException, IOException, InvalidArgumentException, TransactionException {
 
     String ccName = "fabcar";
-    String version = "1";
+    String version = "2";
     String ccSourceLocation = "/Users/albertlacambra/git/fabric-samples/chaincode/fabcar/java/deployment";
 
     NetworkConfig networkConfig = NetworkConfig.fromYamlFile(new File("/Users/albertlacambra/git/lacambra.tech/fabric-toolbox/stateless-client/src/test/resources/network-config.yaml"));
-    networkConfig.getPeerNames().stream().map(n -> {
-      try {
-        System.out.println(n);
-        return networkConfig.getPeerProperties(n);
-      } catch (InvalidArgumentException e) {
-        e.printStackTrace();
-        return null;
-      }
-    })
-        .filter(Objects::nonNull)
-        .forEach(System.out::println);
+    printNetwork(networkConfig);
 
     HFClient hfClient = getTheClient(networkConfig);
     Channel channel = hfClient.loadChannelFromConfig("foo", networkConfig);
@@ -43,6 +33,7 @@ public class DeployChannel {
     Assertions.assertTrue(channel.isInitialized());
 
 
+    //Start Chaincode
     ChaincodeManager chaincodeManager = new ChaincodeManager();
 
 
@@ -67,6 +58,20 @@ public class DeployChannel {
       Assertions.assertTrue(r.peerInstantiationSucceed(), r::getMessage);
       System.out.println(r.getMessage());
     });
+  }
+
+
+
+  private void printNetwork(NetworkConfig networkConfig) {
+    networkConfig.getPeerNames().stream().map(n -> {
+      try {
+        System.out.println(n);
+        return networkConfig.getPeerProperties(n);
+      } catch (InvalidArgumentException e) {
+        e.printStackTrace();
+        return null;
+      }
+    }).filter(Objects::nonNull).forEach(System.out::println);
   }
 
 

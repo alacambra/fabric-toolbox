@@ -46,7 +46,7 @@ public class StatelessClient {
     return CompletableFuture
         .supplyAsync(() -> getProposalResponses(channel, transactionProposalRequest), executorService)
         .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), responsesValidator::validate)
-        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), validatorResult -> sendToOrdererIfSucced(validatorResult, orderers, channel))
+        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), simulationInfo -> sendToOrdererIfSucced(simulationInfo, orderers, channel))
         .thenCompose(fabricTxInfo -> fabricTxInfo)
         .exceptionally(this::createExceptionalResponse);
   }
@@ -61,11 +61,11 @@ public class StatelessClient {
   }
 
 
-  private CompletableFuture<FabricTxInfo> sendToOrdererIfSucced(SimulationInfo validatorResult, Collection<Orderer> orderers, Channel channel) {
-    if (validatorResult.simulationsSucceed()) {
-      return sendTransactionToOrderer(validatorResult, orderers, channel).thenApply(transactionEvent -> this.createTransactionResult(transactionEvent, validatorResult, channel));
+  private CompletableFuture<FabricTxInfo> sendToOrdererIfSucced(SimulationInfo simulationInfo, Collection<Orderer> orderers, Channel channel) {
+    if (simulationInfo.simulationsSucceed()) {
+      return sendTransactionToOrderer(simulationInfo, orderers, channel).thenApply(transactionEvent -> this.createTransactionResult(transactionEvent, simulationInfo, channel));
     } else {
-      return CompletableFuture.completedFuture(FabricTxInfo.createFailedResult(validatorResult.getTransactionId(), validatorResult.getMessage(), validatorResult));
+      return CompletableFuture.completedFuture(FabricTxInfo.createFailedResult(simulationInfo.getTransactionId(), simulationInfo.getMessage(), simulationInfo));
     }
   }
 
@@ -123,7 +123,7 @@ public class StatelessClient {
     }
   }
 
-  private FabricTxInfo createTransactionResult(BlockEvent.TransactionEvent transactionEvent, SimulationInfo validatorResult, Channel channel) {
+  private FabricTxInfo createTransactionResult(BlockEvent.TransactionEvent transactionEvent, SimulationInfo simulationInfo, Channel channel) {
     byte code = transactionEvent.getValidationCode();
     FabricTransaction.TxValidationCode validationCode = FabricTransaction.TxValidationCode.forNumber(code);
     FabricTxInfo result;
@@ -131,9 +131,9 @@ public class StatelessClient {
       result = FabricTxInfo.createSuccessfulResult(
           () -> getBlockInfoForTransactionId(transactionEvent.getTransactionID(), channel),
           transactionEvent,
-          validatorResult);
+          simulationInfo);
     } else {
-      result = FabricTxInfo.createFailedResult(transactionEvent.getTransactionID(), "Tx Error. Returned code is " + validationCode, validatorResult);
+      result = FabricTxInfo.createFailedResult(transactionEvent.getTransactionID(), "Tx Error. Returned code is " + validationCode, simulationInfo);
     }
 
     return result;
@@ -147,16 +147,16 @@ public class StatelessClient {
     }
   }
 
-  public CompletableFuture<BlockEvent.TransactionEvent> sendTransactionToOrderer(SimulationInfo validatorResult, Collection<Orderer> orderers, Channel channel) {
+  public CompletableFuture<BlockEvent.TransactionEvent> sendTransactionToOrderer(SimulationInfo simulationInfo, Collection<Orderer> orderers, Channel channel) {
 
-    if (!validatorResult.simulationsSucceed()) {
+    if (!simulationInfo.simulationsSucceed()) {
       logger.warning("[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
       CompletableFuture<BlockEvent.TransactionEvent> cf = new CompletableFuture<>();
-      cf.completeExceptionally(new RuntimeException("proposal has failed:" + validatorResult.getMessage()));
+      cf.completeExceptionally(new RuntimeException("proposal has failed:" + simulationInfo.getMessage()));
       return cf;
     }
 
-    return channel.sendTransaction(validatorResult.getSuccessfulProposals(), orderers);
+    return channel.sendTransaction(simulationInfo.getSuccessfulProposals(), orderers);
   }
 
   private TransactionProposalRequest createTransactionProposalRequest(ChaincodeID chaincodeID, String functionName, ArrayList<String> args, HFClient client) {

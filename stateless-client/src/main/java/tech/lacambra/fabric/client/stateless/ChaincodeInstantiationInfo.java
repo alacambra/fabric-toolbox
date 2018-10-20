@@ -11,6 +11,7 @@ public class ChaincodeInstantiationInfo {
 
   private final boolean successful;
   private final String message;
+  private final boolean alreadyDeployed;
   private BlockEvent.TransactionEvent transactionEvent;
   private ProposalResponse proposalResponse;
   private Exception exception;
@@ -20,6 +21,7 @@ public class ChaincodeInstantiationInfo {
     // Install will have no signing cause it's not really targeted to a channel. So not needed to call proposalResponse.isVerified()
     successful = proposalResponse.getStatus() == ChaincodeResponse.Status.SUCCESS;
     message = extractMessageFromProposal(proposalResponse);
+    alreadyDeployed = false;
   }
 
   private ChaincodeInstantiationInfo(ChaincodeInstantiationInfo chaincodeInstantiationInfo, BlockEvent.TransactionEvent transactionEvent) {
@@ -36,11 +38,13 @@ public class ChaincodeInstantiationInfo {
     this.exception = Objects.requireNonNull(exception);
     successful = false;
     message = exception.getMessage();
+    alreadyDeployed = false;
   }
 
   private ChaincodeInstantiationInfo(ChaincodeID chaincodeID) {
     successful = true;
-    message = "";
+    message = String.format("Chaincode %s:%s was already deployed", chaincodeID.getName(), chaincodeID.getVersion());
+    alreadyDeployed = true;
   }
 
   public ProposalResponse getProposalResponse() {
@@ -61,6 +65,10 @@ public class ChaincodeInstantiationInfo {
 
   public boolean isSuccessful() {
     return peerInstantiationSucceed() && instatiationTransactionSucceed();
+  }
+
+  public boolean isAlreadyDeployed() {
+    return alreadyDeployed;
   }
 
   public BlockEvent.TransactionEvent getTransactionEvent() {
