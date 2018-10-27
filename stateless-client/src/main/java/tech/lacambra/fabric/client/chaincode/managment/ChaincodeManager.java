@@ -1,10 +1,13 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client.chaincode.managment;
 
 import org.hyperledger.fabric.protos.peer.Query;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.ChaincodeEndorsementPolicyParseException;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
+import tech.lacambra.fabric.client.FabricClientException;
+import tech.lacambra.fabric.client.Printer;
+import tech.lacambra.fabric.client.SDKUtilsWrapper;
 
 import java.io.File;
 import java.io.IOException;
@@ -306,10 +309,6 @@ public class ChaincodeManager {
     return found;
   }
 
-  public boolean isChaincodeOnCurrentVersion(ChaincodeID chaincodeID, Query.ChaincodeInfo chaincodeInfo) {
-    return chaincodeInfo.getVersion().equals(chaincodeID.getVersion());
-  }
-
   private <T extends TransactionRequest> T prepareGenericProposalRequest(
       ChaincodeID chaincodeID,
       Supplier<T> proposalRequestSupplier,
@@ -409,19 +408,6 @@ public class ChaincodeManager {
     }
 
     return found;
-  }
-
-  private CompletableFuture<BlockEvent.TransactionEvent> sendTransactionToOrderer(SimulationInfo validatorResult, Collection<Orderer> orderers, Channel
-      channel) {
-
-    if (!validatorResult.simulationsSucceed()) {
-      LOGGER.warning(() -> "[sendTransactionToOrderer] Trying to send an unsuccessful proposal. Ignoring it...");
-      CompletableFuture<BlockEvent.TransactionEvent> cf = new CompletableFuture<>();
-      cf.completeExceptionally(new RuntimeException("proposal has failed:" + validatorResult.getMessage()));
-      return cf;
-    }
-
-    return channel.sendTransaction(validatorResult.getSuccessfulProposals(), orderers);
   }
 
   private ChaincodeInstantiationInfo sendTransactionToOrderer(

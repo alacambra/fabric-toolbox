@@ -1,8 +1,10 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client.chaincode;
 
 import org.hyperledger.fabric.protos.peer.FabricTransaction;
 import org.hyperledger.fabric.sdk.BlockEvent;
 import org.hyperledger.fabric.sdk.BlockInfo;
+import tech.lacambra.fabric.client.stateless.SimulationInfo;
+import tech.lacambra.fabric.client.stateless.StatelessClientException;
 
 import java.util.Objects;
 import java.util.Optional;

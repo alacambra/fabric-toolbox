@@ -1,11 +1,8 @@
 package tech.lacambra.fabric.client;
 
-import org.hyperledger.fabric.sdk.ChaincodeID;
-import org.hyperledger.fabric.sdk.Channel;
-import org.hyperledger.fabric.sdk.HFClient;
-import org.hyperledger.fabric.sdk.Orderer;
-import tech.lacambra.fabric.client.stateless.FabricTxInfo;
-import tech.lacambra.fabric.client.stateless.PeerTransactionValidator;
+import org.hyperledger.fabric.sdk.*;
+import tech.lacambra.fabric.client.chaincode.FabricTxInfo;
+import tech.lacambra.fabric.client.chaincode.PeerTransactionValidator;
 import tech.lacambra.fabric.client.stateless.SimulationInfo;
 import tech.lacambra.fabric.client.stateless.StatelessClient;
 
@@ -18,14 +15,14 @@ public class ChaincodeClient {
   private String functionName;
   private Collection<String> params;
   private Collection<Orderer> orderers;
+  private Collection<Peer> peers;
   private Channel channel;
   private HFClient client;
   private PeerTransactionValidator responsesValidator;
   private StatelessClient statelessClient;
 
 
-  public ChaincodeClient(StatelessClient statelessClient) {
-    this.statelessClient = statelessClient;
+  public ChaincodeClient() {
   }
 
   public ChaincodeClient withChaincodeId(String ccName, String ccVersion) {
@@ -48,8 +45,8 @@ public class ChaincodeClient {
     return this;
   }
 
-  public ChaincodeClient withPeers(String ccName, String ccVersion) {
-    chaincodeID = ChaincodeID.newBuilder().setName(ccName).setVersion(ccVersion).build();
+  public ChaincodeClient withPeers(Collection<Peer> peers) {
+    this.peers = peers;
     return this;
   }
 

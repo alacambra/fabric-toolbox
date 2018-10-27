@@ -4,6 +4,9 @@ import org.hyperledger.fabric.protos.peer.FabricTransaction;
 import org.hyperledger.fabric.sdk.*;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
 import org.hyperledger.fabric.sdk.exception.ProposalException;
+import tech.lacambra.fabric.client.FabricClientException;
+import tech.lacambra.fabric.client.chaincode.FabricTxInfo;
+import tech.lacambra.fabric.client.chaincode.PeerTransactionValidator;
 
 import java.time.Duration;
 import java.util.*;
@@ -46,7 +49,19 @@ public class StatelessClient {
     return CompletableFuture
         .supplyAsync(() -> getProposalResponses(channel, transactionProposalRequest), executorService)
         .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), responsesValidator::validate)
-        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), simulationInfo -> sendToOrdererIfSucced(simulationInfo, orderers, channel))
+        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), simulationInfo -> sendToOrderedIfSucceed(simulationInfo, orderers, channel))
+        .thenCompose(fabricTxInfo -> fabricTxInfo)
+        .exceptionally(this::createExceptionalResponse);
+  }
+
+  public CompletableFuture<FabricTxInfo> invokeChaincode2(ChaincodeID chaincodeID, String functionName, Collection<String> params, Collection<Orderer> orderers, Channel channel, HFClient client, PeerTransactionValidator responsesValidator) {
+
+    TransactionProposalRequest transactionProposalRequest = createTransactionProposalRequest(chaincodeID, functionName, new ArrayList<>(params), client);
+
+    return CompletableFuture
+        .supplyAsync(() -> getProposalResponses(channel, transactionProposalRequest), executorService)
+        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), responsesValidator::validate)
+        .applyToEither(timeoutAfter(timeout.getSeconds(), TimeUnit.SECONDS), simulationInfo -> sendToOrderedIfSucceed(simulationInfo, orderers, channel))
         .thenCompose(fabricTxInfo -> fabricTxInfo)
         .exceptionally(this::createExceptionalResponse);
   }
@@ -61,7 +76,7 @@ public class StatelessClient {
   }
 
 
-  private CompletableFuture<FabricTxInfo> sendToOrdererIfSucced(SimulationInfo simulationInfo, Collection<Orderer> orderers, Channel channel) {
+  private CompletableFuture<FabricTxInfo> sendToOrderedIfSucceed(SimulationInfo simulationInfo, Collection<Orderer> orderers, Channel channel) {
     if (simulationInfo.simulationsSucceed()) {
       return sendTransactionToOrderer(simulationInfo, orderers, channel).thenApply(transactionEvent -> this.createTransactionResult(transactionEvent, simulationInfo, channel));
     } else {
@@ -187,7 +202,6 @@ public class StatelessClient {
     queryByChaincodeRequest.setChaincodeID(chaincodeID);
     queryByChaincodeRequest.setChaincodeLanguage(TransactionRequest.Type.JAVA);
 
-    //TODO: is that really needed?
     Map<String, byte[]> transientProposalData = new HashMap<>();
     transientProposalData.put("HyperLedgerFabric", "QueryByChaincodeRequest:JavaSDK".getBytes(UTF_8));
     transientProposalData.put("method", "QueryByChaincodeRequest".getBytes(UTF_8));

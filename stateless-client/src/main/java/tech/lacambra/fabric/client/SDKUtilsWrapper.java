@@ -1,9 +1,10 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client;
 
 import org.hyperledger.fabric.sdk.HFClient;
 import org.hyperledger.fabric.sdk.ProposalResponse;
 import org.hyperledger.fabric.sdk.SDKUtils;
 import org.hyperledger.fabric.sdk.exception.InvalidArgumentException;
+import tech.lacambra.fabric.client.stateless.StatelessClientException;
 
 import java.io.IOException;
 import java.util.Collection;

@@ -1,4 +1,6 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client;
+
+import tech.lacambra.fabric.client.stateless.StatelessClientException;
 
 public class FabricClientException extends StatelessClientException {
 

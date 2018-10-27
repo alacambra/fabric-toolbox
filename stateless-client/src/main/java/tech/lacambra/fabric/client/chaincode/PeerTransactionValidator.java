@@ -1,8 +1,12 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client.chaincode;
 
 import com.google.protobuf.ByteString;
 import org.hyperledger.fabric.sdk.ChaincodeResponse;
 import org.hyperledger.fabric.sdk.ProposalResponse;
+import tech.lacambra.fabric.client.Printer;
+import tech.lacambra.fabric.client.SDKUtilsWrapper;
+import tech.lacambra.fabric.client.stateless.SimulationInfo;
+import tech.lacambra.fabric.client.stateless.ValidatorInfoBuilder;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -79,11 +83,15 @@ public class PeerTransactionValidator {
 
     ProposalResponseCheck proposalResponseCheck = new ProposalResponseCheck();
     proposalResponseCheck.responseIsValid = response.isVerified() && response.getStatus() == ProposalResponse.Status.SUCCESS;
-    proposalResponseCheck.responsesMismatch = proposalResponseCheck.responseIsValid && lastResponse != null;
+    proposalResponseCheck.responsesMismatch = proposalResponseCheck.responseIsValid && (lastResponse != null && !proposalResponsesAreEquals(response, lastResponse));
     proposalResponseCheck.transactionId = response.getTransactionID();
     proposalResponseCheck.lastValidResponse = proposalResponseCheck.responseIsValid ? response : lastResponse;
 
     return proposalResponseCheck;
+  }
+
+  private boolean proposalResponsesAreEquals(ProposalResponse r1, ProposalResponse r2) {
+    return true;
   }
 
   private static class ProposalResponseCheck {

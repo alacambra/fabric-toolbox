@@ -1,6 +1,7 @@
 package tech.lacambra.fabric.client.stateless;
 
 import org.hyperledger.fabric.sdk.ProposalResponse;
+import tech.lacambra.fabric.client.chaincode.PeerTransactionValidator;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -44,6 +45,12 @@ public class SimulationInfo {
     return new ArrayList<>(failedProposals);
   }
 
+  public String getPayloadAsString() {
+    return successfulProposals.stream().findAny()
+        .map(proposalResponse -> proposalResponse.getProposalResponse().getResponse().getPayload().toStringUtf8())
+        .orElse("SimulationInfo: no-payload-file");
+  }
+
   /**
    * at least one proposal is valid and can be sent to orderer.
    *
@@ -75,11 +82,6 @@ public class SimulationInfo {
 
   public static SimulationInfo createInvalidConsistencySetsResult(String errorMessage, Collection<ProposalResponse> responses) {
     return createInvalidResultWithResponses(errorMessage, responses);
-  }
-
-  public static SimulationInfo createValid(String reason) {
-    Objects.requireNonNull(reason);
-    return new SimulationInfo(true, reason, Collections.emptyList());
   }
 
   public static SimulationInfo createInvalid(String reason) {

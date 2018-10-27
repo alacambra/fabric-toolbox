@@ -1,6 +1,7 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client;
 
 import org.hyperledger.fabric.sdk.*;
+import tech.lacambra.fabric.client.stateless.SimulationInfo;
 
 import java.util.Collection;
 import java.util.stream.Collectors;

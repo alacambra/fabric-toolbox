@@ -1,8 +1,9 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client.chaincode.managment;
 
 import org.hyperledger.fabric.sdk.ChaincodeID;
 import org.hyperledger.fabric.sdk.ChaincodeResponse;
 import org.hyperledger.fabric.sdk.ProposalResponse;
+import tech.lacambra.fabric.client.Printer;
 
 import java.util.Objects;
 

@@ -1,4 +1,4 @@
-package tech.lacambra.fabric.client.stateless;
+package tech.lacambra.fabric.client.chaincode.managment;
 
 public class ChaincodeDeploymentException extends RuntimeException{
 
