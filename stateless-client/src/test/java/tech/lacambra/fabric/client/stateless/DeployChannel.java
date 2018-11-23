@@ -31,7 +31,7 @@ public class DeployChannel {
 
 
   @Test
-  public void startChaincode() throws NetworkConfigurationException, IOException, InvalidArgumentException, TransactionException, InterruptedException, TimeoutException, ExecutionException {
+  public void startChaincode() throws NetworkConfigurationException, IOException, InvalidArgumentException, TransactionException {
 
     String ccName = "fabcar";
     String ccVersion = "1";
@@ -48,8 +48,6 @@ public class DeployChannel {
     Assertions.assertFalse(channel.getPeers(EnumSet.of(Peer.PeerRole.EVENT_SOURCE)).isEmpty());
 
 
-    //Start Chaincode
-//    Thread.sleep(1000000000);
     ChaincodeManager chaincodeManager = new ChaincodeManager();
 
 
