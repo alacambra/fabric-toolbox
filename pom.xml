@@ -13,6 +13,8 @@
         <module>messaging</module>
         <module>commons</module>
         <module>messaging-default-implementation</module>
+        <module>fabcar-sample</module>
+        <module>fabric-mock</module>
     </modules>
     <packaging>pom</packaging>
 
@@ -50,12 +52,18 @@
         <repository>
             <id>ArtifactoryLacambraDe</id>
             <name>artifactory.lacambra.de</name>
-            <url>http://54.93.165.252/artifactory/lacambra.tech/</url>
+            <url>http://localhost:8081/artifactory/lacambra.tech/</url>
         </repository>
     </distributionManagement>
 
     <dependencyManagement>
         <dependencies>
+
+            <dependency>
+                <artifactId>stateless-client</artifactId>
+                <groupId>tech.lacambra.fabric</groupId>
+                <version>${project.version}</version>
+            </dependency>
 
             <dependency>
                 <groupId>tech.lacambra.fabric</groupId>
@@ -75,16 +83,22 @@
                 <version>${project.version}</version>
             </dependency>
 
-
             <dependency>
                 <groupId>org.hyperledger.fabric-sdk-java</groupId>
                 <artifactId>fabric-sdk-java</artifactId>
                 <version>${fabric.sdk.java.version}</version>
             </dependency>
+
             <dependency>
                 <groupId>org.hyperledger.fabric-chaincode-java</groupId>
                 <artifactId>fabric-chaincode-shim</artifactId>
                 <version>1.3.0</version>
+            </dependency>
+
+            <dependency>
+                <groupId>com.google.guava</groupId>
+                <artifactId>guava</artifactId>
+                <version>21.0</version>
             </dependency>
 
             <dependency>
@@ -111,6 +125,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
+
         </dependencies>
     </dependencyManagement>
     <dependencies>

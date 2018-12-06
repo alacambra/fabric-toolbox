@@ -1,6 +1,10 @@
 package tech.lacambra.fabric.chaincode.execution;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.hyperledger.fabric.shim.ChaincodeStub;
+import tech.lacambra.fabric.chaincode.metainfo.ContractMetaInfo;
+import tech.lacambra.fabric.chaincode.metainfo.FunctionMetaInfo;
 import tech.lacambra.fabric.client.messaging.*;
 
 import javax.json.JsonObject;
@@ -14,7 +18,9 @@ import java.util.stream.Stream;
 
 public class ContractExecutor {
 
-  public ContractExecution executeFunction(Object contract, InvocationRequest invocationRequest, ChaincodeStub stub, MessageConverterProvider converterProvider) {
+  private static final Log LOGGER = LogFactory.getLog(ContractExecutor.class);
+
+  public ContractExecution executeFunction(ContractMetaInfo contractMetaInfo, InvocationRequest invocationRequest, ChaincodeStub stub, MessageConverterProvider converterProvider) {
 
     try {
       IncomingApplicationMessage applicationMessage = converterProvider
@@ -24,10 +30,11 @@ public class ContractExecutor {
 
       String function = invocationRequest.getFunction();
 
-      Method method = Stream.of(contract.getClass().getMethods())
-          .filter(m -> m.getName().equalsIgnoreCase(function))
-          .findFirst()
-          .orElseThrow(() -> new ContractExecutionException(String.format("Function not found for contract %s and function %s", contract.getClass(), function)));
+      FunctionMetaInfo functionMetaInfo = contractMetaInfo.getFunctionMetaInfo(function);
+
+      Method method = functionMetaInfo.getMethod();
+
+      Object contract = contractMetaInfo.getContractClass().getConstructor().newInstance();
 
       Object[] paramsInstance = getParamInstances(method, applicationMessage, converterProvider);
       Object returnValue = method.invoke(contract, paramsInstance);
@@ -36,7 +43,7 @@ public class ContractExecutor {
       return new ContractExecution(convertedValue);
 
     } catch (Exception e) {
-      e.printStackTrace();
+      LOGGER.info(e.getMessage(), e);
       return new ContractExecution(new ContractExecutionException(e));
     }
   }
@@ -55,7 +62,7 @@ public class ContractExecutor {
     Object outgoingApplicationMessage;
 
     if (OutgoingApplicationMessage.class.isAssignableFrom(returnType)) {
-      //If a specific converter exists for IncommingApplicationMessage use it, otherwise pass it directly
+      //If a specific converter exists for IncomingApplicationMessage use it, otherwise pass it directly
       outgoingApplicationMessage = converter.map(r -> r.convert(r, JsonObject.class, null)).orElse(value);
     } else {
 
@@ -97,7 +104,7 @@ public class ContractExecutor {
       } else {
         paramInstance = converter
             .map(r -> r.convert(inputInstance, outputType, genericOutputType))
-            .orElseThrow(() -> new ContractExecutionException("No reader found for " + inputType));
+            .orElseThrow(() -> new ContractExecutionException(String.format("No reader found for %s to %s", inputType, outputType)));
       }
 
       paramsInstance[i] = paramInstance;
@@ -115,7 +122,7 @@ public class ContractExecutor {
     Header headerAnnotation = getHeaderAnnotation(annotations);
 
     if (bodyAnnotation != null && headerAnnotation != null) {
-      throw new ContractExecutionException("Value cannot be taklen from both, @Header and @Payload.");
+      throw new ContractExecutionException("Value cannot be taken from both, @Header and @Payload.");
     }
 
     if (bodyAnnotation != null) {

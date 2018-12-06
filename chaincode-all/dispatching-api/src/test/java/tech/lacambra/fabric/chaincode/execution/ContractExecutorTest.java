@@ -5,6 +5,9 @@ import org.apache.commons.logging.LogFactory;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import tech.lacambra.fabric.chaincode.metainfo.ContractMetaInfo;
+import tech.lacambra.fabric.chaincode.metainfo.FunctionMetaInfo;
+import tech.lacambra.fabric.chaincode.metainfo.FunctionMetaInfoLoader;
 import tech.lacambra.fabric.client.messaging.DefaultMessageConverterProvider;
 import tech.lacambra.fabric.client.messaging.InvocationRequest;
 import tech.lacambra.fabric.client.messaging.MessageConverterProvider;
@@ -12,6 +15,7 @@ import tech.lacambra.fabric.client.messaging.OutgoingApplicationMessage;
 
 import javax.json.Json;
 import java.util.Arrays;
+import java.util.List;
 import java.util.stream.Collectors;
 
 class ContractExecutorTest {
@@ -20,6 +24,7 @@ class ContractExecutorTest {
 
   private ContractExecutor cut;
   private MessageConverterProvider messageConverterProvider;
+  ContractMetaInfo contractMetaInfo;
 
   @BeforeEach
   void setUp() {
@@ -27,12 +32,15 @@ class ContractExecutorTest {
     messageConverterProvider = new DefaultMessageConverterProvider();
 //    messageConverterProvider.addConverter();
 
+    List<FunctionMetaInfo> functionMetaInfo = new FunctionMetaInfoLoader().exploreContract(ContractSample.class);
+    contractMetaInfo = new ContractMetaInfo(ContractSample.class, functionMetaInfo);
+
   }
 
   @Test
   void executeFunctionFails() {
     ContractExecution contractExecution = cut.executeFunction(
-        new ContractSample(),
+        contractMetaInfo,
         creaInvocationRequest("cName", "fn1", Json.createObjectBuilder().build()),
         null,
         messageConverterProvider
@@ -44,7 +52,7 @@ class ContractExecutorTest {
   @Test
   void executeFunctionSucceed() {
     ContractExecution contractExecution = cut.executeFunction(
-        new ContractSample(),
+        contractMetaInfo,
         creaInvocationRequest("cName", "fn1", Arrays.asList(Json.createObjectBuilder().build().toString().getBytes())),
         null,
         messageConverterProvider
@@ -67,7 +75,7 @@ class ContractExecutorTest {
         .collect(Collectors.joining(", ")));
 
     ContractExecution contractExecution = cut.executeFunction(
-        new ContractSample(),
+        contractMetaInfo,
         creaInvocationRequest("cName", "fn2", Arrays.asList(Json.createObjectBuilder().add("body", Json.createObjectBuilder().add("param", v)).build().toString().getBytes())),
         null,
         messageConverterProvider

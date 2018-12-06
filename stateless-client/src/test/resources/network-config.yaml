@@ -106,6 +106,52 @@ channels:
     # the format follows the "cannonical name" of chaincodes by fabric code
     - fabcar:v1
 
+  working-channel:
+    # Required. list of orderers designated by the application to use for transactions on this
+    # channel. This list can be a result of access control ("org1" can only access "ordererA"), or
+    # operational decisions to share loads from applications among the orderers.  The values must
+    # be "names" of orgs defined under "organizations/peers"
+    orderers:
+    - orderer.climatecoop.com
+
+    # Required. list of peers from participating orgs
+    peers:
+      peer0.lacambra.tech:
+        # [Optional]. will this peer be sent transaction proposals for endorsement? The peer must
+        # have the chaincode installed. The app can also use this property to decide which peers
+        # to send the chaincode install request. Default: true
+        endorsingPeer: true
+
+        # [Optional]. will this peer be sent query proposals? The peer must have the chaincode
+        # installed. The app can also use this property to decide which peers to send the
+        # chaincode install request. Default: true
+        chaincodeQuery: true
+
+        # [Optional]. will this peer be sent query proposals that do not require chaincodes, like
+        # queryBlock(), queryTransaction(), etc. Default: true
+        ledgerQuery: true
+
+        # [Optional]. will this peer be the target of the SDK's listener registration? All peers can
+        # produce events but the app typically only needs to connect to one to listen to events.
+        # Default: true
+        eventSource: true
+
+      peer1.lacambra.tech:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+      peer2.lacambra.tech:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+    chaincodes:
+    # the format follows the "cannonical name" of chaincodes by fabric code
+    - fabcar:v1
+
 #
 # list of participating organizations in this network
 #
@@ -134,7 +180,7 @@ organizations:
     # this way. The SDK should allow applications to set the org admin identity via APIs, and only use
     # this route as an alternative when it exists.
     adminPrivateKey:
-      path: /Users/albertlacambra/git/fabric-material/policies-check/crypto-config/peerOrganizations/lacambra.tech/users/Admin@lacambra.tech/msp/keystore/693f0496cb1a96e1acb243cb74c74735415b9b88ad1c0c6b4360dc7865719aa3_sk
+      path: /Users/albertlacambra/git/fabric-material/fab-1.3-1org/crypto-config/peerOrganizations/lacambra.tech/users/Admin@lacambra.tech/msp/keystore/8f9cc76b1581e0751a6d442bfc09aff087b227783b0cbeac2f976b393519c203_sk
     #    pem: |
     #          -----BEGIN PRIVATE KEY-----
     #          MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgpANnM2zJ/oz7c31B
@@ -143,8 +189,8 @@ organizations:
     #         -----END PRIVATE KEY-----
 
     signedCert:
-      #      path: /Users/albertlacambra/git/fabric-material/policies-check/crypto-config/peerOrganizations/lacambra.tech/peers/peer0.lacambra.tech/msp/admincerts/Admin@lacambra.tech-cert.pem
-      path: /Users/albertlacambra/git/fabric-material/policies-check/crypto-config/peerOrganizations/lacambra.tech/msp/admincerts/Admin@lacambra.tech-cert.pem
+      #      path: /Users/albertlacambra/git/fabric-material/fab-1.3-1org/crypto-config/peerOrganizations/lacambra.tech/peers/peer0.lacambra.tech/msp/admincerts/Admin@lacambra.tech-cert.pem
+      path: /Users/albertlacambra/git/fabric-material/fab-1.3-1org/crypto-config/peerOrganizations/lacambra.tech/msp/admincerts/Admin@lacambra.tech-cert.pem
       #pem: |
       #      -----BEGIN CERTIFICATE-----
       #      MIICGjCCAcCgAwIBAgIRAPDmqtljAyXFJ06ZnQjXqbMwCgYIKoZIzj0EAwIwczEL

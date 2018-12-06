@@ -3,54 +3,35 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <parent>
-        <artifactId>chaincode-all</artifactId>
-        <groupId>tech.lacambra.fabric.chaincode</groupId>
+        <artifactId>fabcar-sample</artifactId>
+        <groupId>tech.lacambra.fabric.example</groupId>
         <version>1.0-SNAPSHOT</version>
     </parent>
     <modelVersion>4.0.0</modelVersion>
-
-    <artifactId>dispatching-api</artifactId>
+    <artifactId>fabcar-client</artifactId>
 
     <dependencies>
-
         <dependency>
+            <artifactId>stateless-client</artifactId>
             <groupId>tech.lacambra.fabric</groupId>
-            <artifactId>messaging</artifactId>
         </dependency>
-
-        <dependency>
-            <groupId>tech.lacambra.fabric</groupId>
-            <artifactId>commons</artifactId>
-        </dependency>
-
-        <dependency>
-            <groupId>org.hyperledger.fabric-chaincode-java</groupId>
-            <artifactId>fabric-chaincode-shim</artifactId>
-        </dependency>
-
         <dependency>
             <groupId>tech.lacambra.fabric</groupId>
             <artifactId>messaging-default-implementation</artifactId>
         </dependency>
-
+        <dependency>
+            <groupId>tech.lacambra.fabric.example</groupId>
+            <artifactId>fabcar-commons</artifactId>
+            <version>1.0-SNAPSHOT</version>
+        </dependency>
         <dependency>
             <groupId>org.glassfish</groupId>
             <artifactId>javax.json</artifactId>
         </dependency>
-
         <dependency>
             <artifactId>junit-jupiter-engine</artifactId>
             <groupId>org.junit.jupiter</groupId>
         </dependency>
-
-        <dependency>
-            <groupId>org.mockito</groupId>
-            <artifactId>mockito-core</artifactId>
-            <version>2.23.0</version>
-            <scope>test</scope>
-        </dependency>
-
-
     </dependencies>
 
 </project>
