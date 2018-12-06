@@ -11,17 +11,24 @@ import tech.lacambra.fabric.chaincode.metainfo.ContractsRegister;
 import tech.lacambra.fabric.client.messaging.InvocationRequest;
 import tech.lacambra.fabric.client.messaging.MessageConverterProvider;
 
+import java.util.Objects;
+import java.util.Optional;
+import java.util.stream.Collectors;
+
 public class RequestDispatcher extends ChaincodeBase {
 
   private static final Log LOGGER = LogFactory.getLog(RequestDispatcher.class);
   private final ContractsRegister contractsRegister;
   private final ContractExecutor contractExecutor;
-  private final MessageConverterProvider readerWriterProvider;
+  private final MessageConverterProvider messageConverterProvider;
 
-  public RequestDispatcher(ContractExecutor contractExecutor, ContractsRegister contractsRegister, MessageConverterProvider readerWriterProvider) {
+  public RequestDispatcher(ContractExecutor contractExecutor, ContractsRegister contractsRegister, MessageConverterProvider messageConverterProvider) {
     this.contractExecutor = contractExecutor;
     this.contractsRegister = contractsRegister;
-    this.readerWriterProvider = readerWriterProvider;
+    this.messageConverterProvider = messageConverterProvider;
+
+    LOGGER.info("[RequestDispatcher] Contracts found: " + contractsRegister.getRegister().stream().map(Objects::toString).collect(Collectors.joining(", ")));
+    LOGGER.info("[RequestDispatcher] MessageConverters found: " + messageConverterProvider.getConverters().stream().map(Object::getClass).map(Class::getName).collect(Collectors.joining(", ")));
   }
 
   @Override
@@ -41,7 +48,7 @@ public class RequestDispatcher extends ChaincodeBase {
         .orElseThrow(() -> new DispatcherException(String.format("Contract with id %s not found", invocationRequest.getContractName())));
 
     try {
-      ContractExecution contractExecutionResult = contractExecutor.executeFunction(contract, invocationRequest, chaincodeStub, readerWriterProvider);
+      ContractExecution contractExecutionResult = contractExecutor.executeFunction(contract, invocationRequest, chaincodeStub, messageConverterProvider);
       return createResponse(contractExecutionResult);
     } catch (Exception e) {
       return createResponse(e);
@@ -49,14 +56,29 @@ public class RequestDispatcher extends ChaincodeBase {
   }
 
   private Response createResponse(ContractExecution contractExecutionResult) {
+
+    Object resultPayload = contractExecutionResult.getPayload();
+
+    byte[] bytes = null;
+
+    if (resultPayload != null) {
+
+      bytes = messageConverterProvider
+          .getConverter(resultPayload.getClass(), byte[].class)
+          .orElseThrow(DispatcherException::new)
+          .convert(resultPayload, byte[].class, null);
+    }
+
     if (contractExecutionResult.isSucceed()) {
-      return newSuccessResponse();
+      return newSuccessResponse("", bytes);
     } else {
-      return newErrorResponse();
+      String message = Optional.ofNullable(contractExecutionResult.getThrowable()).map(Throwable::getMessage).orElse("");
+      return newErrorResponse(message, bytes);
     }
   }
 
   private Response createResponse(Exception e) {
+    e.printStackTrace();
     return newErrorResponse(e);
   }
 }

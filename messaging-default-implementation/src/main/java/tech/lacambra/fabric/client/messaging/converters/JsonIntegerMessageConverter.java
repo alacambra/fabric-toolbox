@@ -18,9 +18,7 @@ public class JsonIntegerMessageConverter implements MessageConverter {
   public boolean canConvert(Class inputType, Type inputParametrizedType, Class outputType, Type outputParametrizedType) {
 
 
-    return (JsonNumber.class.equals(inputType) && outputType.equals(Integer.class));
-//        (JsonNumber.class.equals(inputType) && outputType.equals(Long.class)) ||
-//        (JsonNumber.class.equals(inputType) && outputType.equals(BigDecimal.class)) ||
+    return (JsonNumber.class.isAssignableFrom(inputType) && outputType.equals(Integer.class));
 
   }
 

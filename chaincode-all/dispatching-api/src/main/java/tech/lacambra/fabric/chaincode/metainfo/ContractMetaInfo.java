@@ -42,6 +42,14 @@ public class ContractMetaInfo {
     return contractId;
   }
 
+  public Map<String, FunctionMetaInfo> getFunctions() {
+    return new LinkedHashMap<>(functions);
+  }
+
+  public FunctionMetaInfo getFunctionMetaInfo(String fnKey) {
+    return functions.get(fnKey);
+  }
+
   @Override
   public String toString() {
     return "ContractMetaInfo{" +

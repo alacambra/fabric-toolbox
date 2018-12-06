@@ -32,7 +32,7 @@ public class FunctionMetaInfoLoader {
 
     validateFunctions(functionMetaInfos);
 
-    LOGGER.info("[exploreContract] found Contract functions=" + validMethods.values().stream().map(FunctionMetaInfo::toString).collect(Collectors.joining(", ")));
+    LOGGER.info("[exploreContract] found Contract functions=" + functionMetaInfos.stream().map(FunctionMetaInfo::toString).collect(Collectors.joining(", ")));
 
     return functionMetaInfos;
   }
