@@ -1,16 +1,26 @@
 package tech.lacambra.fabric.injection.cdi;
 
+import javax.annotation.PostConstruct;
+import javax.inject.Inject;
 import java.util.Objects;
 import java.util.Random;
 
 @ChaincodeRequestScope
 public class SomeService {
 
+  @Inject
+  ChaincodeStubMock stubMock;
+
   final int id;
+
+  @PostConstruct
+  public void init() {
+    Objects.requireNonNull(stubMock);
+    System.out.println("Init SomeService:" + hashCode() + ", id:" + id + "m stubMock:" + stubMock);
+  }
 
   public SomeService() {
     id = new Random().nextInt();
-    System.out.println("Init SomeService:" + hashCode() + ", id:" + id);
   }
 
   public void sayHello() {

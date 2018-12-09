@@ -20,6 +20,11 @@
 
         <dependency>
             <groupId>tech.lacambra.fabric</groupId>
+            <artifactId>fabric-cdi</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>tech.lacambra.fabric</groupId>
             <artifactId>commons</artifactId>
         </dependency>
 

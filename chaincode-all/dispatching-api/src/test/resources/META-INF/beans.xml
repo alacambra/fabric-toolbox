@@ -4,7 +4,4 @@
 		http://xmlns.jcp.org/xml/ns/javaee/beans_1_1.xsd"
        bean-discovery-mode="all">
 
-    <scan>
-        <exclude name="tech.lacambra.fabric.injection.cdi.ChaincodeStubMock"></exclude>
-    </scan>
 </beans>

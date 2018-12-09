@@ -16,4 +16,14 @@
         <module>dispatching-api</module>
     </modules>
 
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>tech.lacambra.fabric</groupId>
+                <artifactId>fabric-cdi</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
 </project>

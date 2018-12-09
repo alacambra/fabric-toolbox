@@ -56,7 +56,10 @@ public class CdiTest {
       BeanManager beanManager = container.getBeanManager();
       ScopeContext<ChaincodeStubMock> ctx = (ScopeContext<ChaincodeStubMock>) beanManager.getContext(ChaincodeRequestScope.class);
       ChaincodeStubMock previous = ctx.enter(stubMock);
+
       try {
+
+        container.select(StubHolder.class).get().setStubMock(stubMock);
         SomeService service = container.select(SomeService.class).get();
         assertEquals(container.select(AnotherService.class).get().getSomeService(), service);
         container.select(AnotherService.class).get().getSomeService().sayHello();
